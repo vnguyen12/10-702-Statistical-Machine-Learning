@@ -1,0 +1,120 @@
+%simple compare
+
+clc
+clear all
+
+matlabpool close force local
+
+matlabpool(7)
+
+matlabpool size
+
+p=0.8; d=6; a=6;b=6.0;
+q=1-p;
+
+%-------f density function------------%
+f = @(x) p*prod(betapdf((x),a,b),2)+q;
+%-------------------------------------%
+
+T=10^6;
+P=sum(rand(T,1)<p);
+Q=T-P;
+Xb=betarnd(a,b,P,d);
+Xu=rand(Q,d);
+X=[Xb;Xu];
+
+X=X(randperm(T),:);
+
+e=mean(-log(f(X)));
+
+nn=7;
+
+Tvec = floor(logspace(3,4,nn));
+epsvector=zeros(nn,1);
+
+
+
+for tloop = 1:nn
+
+    tloop
+
+Niter=28;
+%tic
+T=Tvec(tloop);dp=d;alpha=0.1;
+avec = linspace(.3,3,20);
+kvec = floor(avec*sqrt(T)/2);
+[wo,epsval] = calculateweightgeneral(T,d,avec,dp);
+epsvector(tloop) = epsval;errorvec=[0,0,0,0];errorvecb=[0,0,0,0];
+kvl = length(kvec);
+errorvecT = zeros(Niter,4);
+parfor iter=1:Niter
+    
+    iter
+    
+    P=sum(rand(T,1)<p);Q=T-P;Xb=betarnd(a,b,P,d);
+Xu=rand(Q,d);X=[Xb;Xu];X=X(randperm(T),:);
+
+G_plug = zeros(kvl,1);
+G_BC = zeros(kvl,1);
+
+for i=1:kvl
+[g_plug,g_BC] = truncatedShannnonestimate(X,kvec(i));
+G_plug(i) = g_plug;
+G_BC(i) = g_BC;
+end
+
+G_w = wo*G_plug;
+G_wa = wo*G_BC;
+
+G_plug = G_plug(end);
+G_BC = G_BC(end);
+errorvecT(iter,:) = (([G_plug,G_BC,G_w,G_wa]-e).^2);
+errorvec = errorvec+(([G_plug,G_BC,G_w,G_wa]-e).^2);
+errorvecb = errorvecb+(([G_plug,G_BC,G_w,G_wa]-e));
+end
+errorvec = errorvec/Niter;
+errorvecb=errorvecb/Niter;
+
+%toc
+
+    errorTvec(tloop,:)=errorvec
+    errorTvecStd(tloop,:)=sqrt(var(errorvecT))
+    errorTvecb(tloop,:)=errorvecb
+
+end
+
+matlabpool close 
+
+
+%errorTvec(:,4) = [0.0088,0.0089,0.0065,0.0052,0.0047,0.0031,0.0035,0.0029,0.0018,0.0015,0.0016,0.0012,0.0011,0.0010,9.0e-4,9.0e-4,9.5e-4,8.0e-4,7.0e-4,7.0e-4,7.5e-4,6.5e-4,6.0e-4,6.0e-4,5.0e-4];
+loglog(Tvec,errorTvec(:,1),'r',Tvec,errorTvec(:,2),'b',Tvec,errorTvec(:,3),'g',Tvec,errorTvec(:,4),'k')
+legend('Plug-in estimator','Bias corrected estimator','Weighted estimator','Angled Weighted estimator')
+xlabel('Sample size n')
+ylabel('Mean square error')
+hold on
+loglog(Tvec,errorTvec(:,1)+errorTvecStd(:,1),'r--',Tvec,errorTvec(:,2)+errorTvecStd(:,1),'b--',Tvec,errorTvec(:,3)+errorTvecStd(:,1),'g--',Tvec,errorTvec(:,4)+errorTvecStd(:,1),'k--')
+hold on
+loglog(Tvec,errorTvec(:,1)-errorTvecStd(:,1),'r--',Tvec,errorTvec(:,2)-errorTvecStd(:,1),'b--',Tvec,errorTvec(:,3)-errorTvecStd(:,1),'g--',Tvec,errorTvec(:,4)+errorTvecStd(:,1),'k--')
+figure
+loglog(Tvec,(abs(errorTvecb(:,1))).^2,'r',Tvec,(abs(errorTvecb(:,2))).^2,'b',Tvec,(abs(errorTvecb(:,3))).^2,'k',Tvec,(abs(errorTvecb(:,4))).^2,'g',Tvec,(abs(epsvector)).^2,'c')
+legend('Plug-in estimator','Bias corrected estimator','Weighted estimator','Angled Weighted estimator','epsilon')
+xlabel('Sample size n')
+ylabel('Bias')
+
+errorTvecv = errorTvec-errorTvecb.^2;
+
+figure
+loglog(Tvec,errorTvecv(:,1),'r',Tvec,errorTvecv(:,2),'b',Tvec,errorTvecv(:,3),'k',Tvec,errorTvecv(:,4),'g')
+legend('Plug-in estimator','Bias corrected estimator','Weighted estimator','Angled weighted estimator')
+xlabel('Sample size n')
+ylabel('Variance')
+
+%with error bars
+loglog(Tvec,errorTvec(:,1),'r',Tvec,errorTvec(:,2),'b',Tvec,errorTvec(:,4),'k')
+legend('Plug-in estimator','Bias corrected estimator','Weighted estimator')
+xlabel('Sample size n')
+ylabel('Mean square error')
+hold on
+loglog(Tvec,errorTvec(:,1)+errorTvecStd(:,1),'r--',Tvec,errorTvec(:,2)+errorTvecStd(:,1),'b--',Tvec,errorTvec(:,3)+errorTvecStd(:,1),'g--',Tvec,errorTvec(:,4)+errorTvecStd(:,1),'k--')
+hold on
+loglog(Tvec,errorTvec(:,1)-errorTvecStd(:,1),'r--',Tvec,errorTvec(:,2)-errorTvecStd(:,1),'b--',Tvec,errorTvec(:,3)-errorTvecStd(:,1),'g--',Tvec,errorTvec(:,4)+errorTvecStd(:,1),'k--')

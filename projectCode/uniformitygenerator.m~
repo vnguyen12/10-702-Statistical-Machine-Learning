@@ -1,0 +1,135 @@
+
+%uniformity testing data generator
+clc
+clear all
+
+matlabpool close force local
+
+matlabpool(7)
+
+matlabpool size
+
+Titer = 1000; %total number of points
+
+zerovec = zeros(Titer/2,1);
+onesvec = ones(Titer/2,1);
+
+zeon = [zerovec;onesvec];
+zeon = zeon(randperm(Titer)');
+
+
+T=floor(10*10^2);d=6;a=6.5;b=6.5;dp=d;a2=5.5;b2=5.5;p=0.75;
+sk = floor(0.3*sqrt(T));k=floor(2*sqrt(T));
+[wo,epsval] = calculateweightshannon(T,d,sk,k,dp);
+
+
+shannonsimp = zeros(Titer,1);shannonsi=shannonsimp;
+shannonweight = shannonsimp;
+maxdist=zeros(Titer,1);
+mstcount=zeros(Titer,1);
+spacingcount=zeros(Titer,1);
+
+parfor i = 1:Titer
+   i
+    if(zeon(i)==1)
+        P=sum(rand(T,1)<p);Q=T-P;
+        Xb=betarnd(a,b,P,d);Xu=rand(Q,d);X=[Xb;Xu];X=X(randperm(T),:);
+        [shannonsi(i),shannonsimp(i),shannonweight(i),maxdist(i),mstcount(i),spacingcount(i)] = testforuniformity(X,wo);
+    else
+        P=sum(rand(T,1)<p);Q=T-P;
+        Xb=betarnd(a2,b2,P,d);Xu=rand(Q,d);X=[Xb;Xu];X=X(randperm(T),:);
+        [shannonsi(i),shannonsimp(i),shannonweight(i),maxdist(i),mstcount(i),spacingcount(i)] = testforuniformity(X,wo);
+    end
+    
+end
+
+matlabpool close 
+
+%%
+
+figure(5); hold on; [Xk,Yk] = perfcurve(zeon,-shannonsi,1);
+Zk=smooth(Xk,Yk,8,'sgolay'); plot(Xk,Yk,'r'); axis([0 1 0 1]); areaundercurve(Xk',Yk')
+
+figure(5); hold on; [Xk,Yk] = perfcurve(zeon,-shannonsimp,1);
+Zk=smooth(Xk,Yk,8,'sgolay'); plot(Xk,Yk,'b'); axis([0 1 0 1]); areaundercurve(Xk',Yk')
+
+
+figure(5); hold on; [Xk,Yk] = perfcurve(zeon,-shannonweight,1);
+Zk=smooth(Xk,Yk,8,'sgolay'); plot(Xk,Yk,'g'); axis([0 1 0 1]); areaundercurve(Xk',Yk')
+
+legend('Standard kernel plug-in estimator','Truncated kernel plug-in estimator','Weighted estimator')
+xlabel('False Positive rate')
+ylabel('False Negative rate')
+
+
+% figure(5); hold on; [Xk,Yk] = perfcurve(zeon,maxdist,1);
+% Zk=smooth(Xk,Yk,8,'sgolay'); plot(Xk,Zk,'b'); axis([0 1 0 1]); areaundercurve(Xk',Yk')
+% 
+% 
+% figure(5); hold on; [Xk,Yk] = perfcurve(zeon,mstcount,1);
+% Zk=smooth(Xk,Yk,8,'sgolay'); plot(Xk,Zk,'g'); axis([0 1 0 1]); areaundercurve(Xk',Yk')
+% 
+% 
+% 
+% figure(5); hold on; [Xk,Yk] = perfcurve(zeon,-spacingcount,1);
+% Zk=smooth(Xk,Yk,8,'sgolay'); plot(Xk,Zk,'c'); axis([0 1 0 1]); areaundercurve(Xk',Yk')
+% 
+% 
+% 
+
+
+
+%%
+[a,b] = sort(zeon);
+
+figure(6); 
+
+
+subplot(3,1,1)
+hold on; 
+shannonsiS = -shannonsi(b); 
+t1=shannonsiS(1:Titer/2); t2=shannonsiS((1:Titer/2)+Titer/2);
+m1 = mean(t1); m2=mean(t2); s1 = var(t1);s2=var(t2);d= abs(m2-m1)/sqrt(s1+s2)
+[n,c] = hist(t1,10);
+n=smooth(n);
+plot(c,n)
+[n,c] = hist(t2,10);n=smooth(n);
+plot(c,n,'r')
+
+subplot(3,1,2)
+hold on; 
+shannonsiS = -shannonsimp(b); 
+t1=shannonsiS(1:Titer/2); t2=shannonsiS((1:Titer/2)+Titer/2);
+m1 = mean(t1); m2=mean(t2); s1 = var(t1);s2=var(t2);d= abs(m2-m1)/sqrt(s1+s2)
+[n,c] = hist(t1,10);n=smooth(n);
+plot(c,n)
+[n,c] = hist(t2,10);n=smooth(n);
+plot(c,n,'r')
+
+subplot(3,1,3)
+hold on; 
+shannonsiS = -shannonweight(b); 
+t1=shannonsiS(1:Titer/2); t2=shannonsiS((1:Titer/2)+Titer/2);
+m1 = mean(t1); m2=mean(t2); s1 = var(t1);s2=var(t2);d= abs(m2-m1)/sqrt(s1+s2)
+[n,c] = hist(t1,10);n=smooth(n);
+plot(c,n)
+[n,c] = hist(t2,10);n=smooth(n);
+plot(c,n,'r')
+
+
+%%
+
+%true entropy
+q=1-p;
+%-------f density function------------%
+f = @(x) p*prod(betapdf((x),a,b),2)+q;
+%-------------------------------------%
+%-------f density function------------%
+f2 = @(x) p*prod(betapdf((x),a2,b2),2)+q;
+%-------------------------------------%
+
+
+e1 = mean(-log(f()))
+
+
+figure; [a,b] = sort(zeon); plot(1:Titer,zeon(b),1:Titer,shannonsi(b),'r-',1:Titer,shannonsimp(b),'b-',1:Titer,shannonweight(b),'g-')
